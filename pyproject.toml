@@ -1,0 +1,28 @@
+[project]
+name = "team-mood-tracker"
+version = "0.1.0"
+description = "Team Mood Tracker application for SQR project work."
+authors = [{ name = "Team Mood Tracker Team" }]
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "fastapi>=0.124.2,<0.125.0",
+    "uvicorn[standard]>=0.38.0,<0.39.0",
+    "streamlit>=1.52.1,<2.0.0",
+    "requests>=2.32.5,<3.0.0",
+]
+
+[tool.poetry]
+packages = [{ include = "team_mood_tracker", from = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.2"
+httpx = "^0.28.1"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

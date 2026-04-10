@@ -1,0 +1,2 @@
+"""Team Mood Tracker package."""
+
