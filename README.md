@@ -24,7 +24,7 @@ The app will be available at:
 
 ## Mood History Management API
 
-New endpoints for managing mood entry history:
+Endpoints for managing mood entry history:
 
 - **GET /mood-entries** - List mood entries with optional filtering and sorting
   - Query parameters: `user`, `date_from`, `date_to`, `sort_by` (date/rating), `order` (asc/desc)
