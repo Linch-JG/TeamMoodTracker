@@ -1,13 +1,17 @@
-name: Submission Tests
+name: Quality Gates
 
 on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+
 jobs:
-  pytest-submission-flow:
-    name: pytest submission flow
+  pytest:
+    name: Test suite
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -17,6 +21,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "poetry"
 
       - name: Install Poetry
         run: python -m pip install poetry
@@ -25,4 +30,118 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run pytest gate
-        run: poetry run pytest tests/test_mood_submission.py
+        run: poetry run pytest tests/
+
+  bandit:
+    name: Security scan (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run bandit
+        run: poetry run bandit -r src -q
+
+  dependency-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run pip-audit
+        run: poetry run pip-audit
+
+  api-smoke:
+    name: API smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Start API
+        run: |
+          TEAM_MOOD_DATABASE_PATH="${RUNNER_TEMP}/team-mood-tracker.sqlite3" \
+          poetry run uvicorn team_mood_tracker.backend.app:app --host 127.0.0.1 --port 8000 >api.log 2>&1 &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for API
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"
+          cat api.log
+          exit 1
+
+      - name: Verify OpenAPI smoke paths
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen("http://127.0.0.1:8000/openapi.json") as response:
+              spec = json.load(response)
+
+          required_paths = {
+              "/health",
+              "/mood-entries",
+              "/dashboard/external-context",
+          }
+          missing_paths = sorted(required_paths.difference(spec["paths"]))
+          if missing_paths:
+              raise SystemExit(f"Missing OpenAPI paths: {missing_paths}")
+          print("OpenAPI smoke check passed")
+          PY
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -n "${API_PID:-}" ]; then
+            kill "$API_PID" || true
+          fi

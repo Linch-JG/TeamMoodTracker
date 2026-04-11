@@ -30,11 +30,12 @@ def submit_mood_entry(
     return response.json()
 
 
-def render_submission_form() -> None:
+def render_submission_form(show_heading: bool = True) -> None:
     """Render the Streamlit mood submission form."""
 
-    st.title("Team Mood Tracker")
-    st.write("Share how today feels so the team can notice pressure early.")
+    if show_heading:
+        st.title("Team Mood Tracker")
+        st.write("Share how today feels so the team can notice pressure early.")
 
     with st.form("mood-submission-form", clear_on_submit=True):
         user = st.text_input("Your name")
