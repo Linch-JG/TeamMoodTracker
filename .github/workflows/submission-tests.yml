@@ -8,6 +8,29 @@ permissions:
   contents: read
 
 jobs:
+  pytest-submission-flow:
+    name: pytest submission flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run pytest gate
+        run: poetry run pytest tests/test_mood_submission.py
+
   pytest:
     name: Test suite
     runs-on: ubuntu-latest
