@@ -17,6 +17,7 @@ packages = [{ include = "team_mood_tracker", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
+pytest-cov = "^6.0.0"
 httpx = "^0.28.1"
 bandit = "^1.8.6"
 locust = "^2.42.0"

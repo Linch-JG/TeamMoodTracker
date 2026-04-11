@@ -59,6 +59,50 @@ class MoodEntryRead(MoodEntryCreate):
     )
 
 
+class MoodEntryUpdate(BaseModel):
+    """Request body for updating a mood entry with optional fields."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "mood": "neutral",
+                    "rating": 3,
+                    "comment": "Feeling better after lunch.",
+                }
+            ]
+        }
+    )
+
+    user: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=80,
+        description="Updated user name.",
+        examples=["Alex"],
+    )
+    mood: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=40,
+        description="Updated mood label.",
+        examples=["neutral"],
+    )
+    rating: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Updated mood intensity rating.",
+        examples=[3],
+    )
+    comment: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Updated comment.",
+        examples=["Feeling better after lunch."],
+    )
+
+
 class DailyTrend(BaseModel):
     """Daily average mood trend."""
 

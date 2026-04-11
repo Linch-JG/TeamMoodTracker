@@ -10,8 +10,7 @@ def seed_data():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with sqlite3.connect(DATABASE_PATH) as conn:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS mood_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user TEXT NOT NULL,
@@ -20,8 +19,7 @@ def seed_data():
                 comment TEXT,
                 created_at TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         users = ["Alex", "Maria", "Kirill", "Ilsaf", "Vladimir", "Ravil"]
         moods = {1: "stressed", 2: "sad", 3: "neutral", 4: "good", 5: "happy"}
