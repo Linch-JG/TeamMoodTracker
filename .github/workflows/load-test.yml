@@ -1,0 +1,63 @@
+name: Performance Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locust:
+    name: Locust smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Start API
+        run: |
+          TEAM_MOOD_DATABASE_PATH="${RUNNER_TEMP}/team-mood-tracker.sqlite3" \
+          poetry run uvicorn team_mood_tracker.backend.app:app --host 127.0.0.1 --port 8000 >api.log 2>&1 &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for API
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"
+          cat api.log
+          exit 1
+
+      - name: Run Locust smoke test
+        run: |
+          poetry run locust -f locustfile.py \
+            --host http://127.0.0.1:8000 \
+            --headless \
+            -u 10 \
+            -r 1 \
+            -t 30s \
+            --only-summary
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -n "${API_PID:-}" ]; then
+            kill "$API_PID" || true
+          fi

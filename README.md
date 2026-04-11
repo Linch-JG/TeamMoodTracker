@@ -17,6 +17,8 @@ The app will be available at:
 - FastAPI: `http://127.0.0.1:8000`
 - Streamlit: `http://127.0.0.1:8501`
 
+The Streamlit dashboard include a small external well-being tip widget supported by the FastAPI backend.
+
 Run only the API:
 
 ```bash
@@ -33,6 +35,14 @@ Run tests:
 
 ```bash
 make test
+```
+
+Run quality checks:
+
+```bash
+make security
+make audit
+make load-test
 ```
 
 Remove local caches:

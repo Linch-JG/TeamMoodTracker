@@ -6,10 +6,18 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 
+from team_mood_tracker.backend.api_schemas import ServiceHealth, WellbeingTip
 from team_mood_tracker.backend.database import create_mood_entry, initialize_database
+from team_mood_tracker.backend.external_context import (
+    ExternalContextError,
+    fetch_dashboard_wellbeing_tip,
+)
 from team_mood_tracker.backend.schemas import MoodEntryCreate, MoodEntryRead
+
+
+APP_VERSION = "0.1.0"
 
 
 def create_app(database_path: str | Path | None = None) -> FastAPI:
@@ -23,9 +31,38 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     mood_app = FastAPI(
         title="Team Mood Tracker API",
         description="API for submitting team mood entries.",
-        version="0.1.0",
+        version=APP_VERSION,
         lifespan=lifespan,
     )
+
+    @mood_app.get(
+        "/health",
+        response_model=ServiceHealth,
+        summary="API health check",
+        description="Returns a small health payload so CI and load tests can verify the API is up.",
+        responses={
+            status.HTTP_200_OK: {
+                "description": "API is ready to receive requests.",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "status": "ok",
+                            "service": "team-mood-tracker-api",
+                            "version": APP_VERSION,
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def get_health() -> ServiceHealth:
+        """Return a stable health payload for automation."""
+
+        return ServiceHealth(
+            status="ok",
+            service="team-mood-tracker-api",
+            version=APP_VERSION,
+        )
 
     @mood_app.post(
         "/mood-entries",
@@ -58,6 +95,44 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         """Store a submitted mood entry."""
 
         return create_mood_entry(entry, database_path)
+
+    @mood_app.get(
+        "/dashboard/wellbeing-tip",
+        response_model=WellbeingTip,
+        summary="Get dashboard well-being tip",
+        description=(
+            "Fetches a short external reflection quote for the dashboard so the team check-in page "
+            "shows a small well-being prompt alongside the mood form."
+        ),
+        responses={
+            status.HTTP_200_OK: {
+                "description": "Well-being tip fetched successfully.",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "tip_id": 1,
+                            "advice": "It's just a bad day, not a bad life.",
+                            "author": "Mary Engelbreit",
+                            "source": "ZenQuotes",
+                        }
+                    }
+                },
+            },
+            status.HTTP_502_BAD_GATEWAY: {
+                "description": "The external reflection provider was unavailable."
+            },
+        },
+    )
+    def get_dashboard_wellbeing_tip() -> WellbeingTip:
+        """Return an external reflection quote for the Streamlit dashboard."""
+
+        try:
+            return fetch_dashboard_wellbeing_tip()
+        except ExternalContextError as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(error),
+            ) from error
 
     return mood_app
 
