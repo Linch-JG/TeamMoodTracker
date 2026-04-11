@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install test api frontend run security audit load-test clean
+.PHONY: help install test api frontend run security audit load-test coverage coverage-html clean
 
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
@@ -10,21 +10,30 @@ API_URL ?= http://$(API_HOST):$(API_PORT)
 
 help:
 	@echo "Available commands:"
-	@echo "  make install   Install Poetry dependencies"
-	@echo "  make test      Run pytest"
-	@echo "  make api       Run FastAPI backend"
-	@echo "  make frontend  Run Streamlit frontend"
-	@echo "  make run       Run backend and frontend together"
-	@echo "  make security  Run bandit on src/"
-	@echo "  make audit     Run pip-audit inside the Poetry environment"
-	@echo "  make load-test Run the Locust performance smoke test"
-	@echo "  make clean     Remove local caches"
+	@echo "  make install      Install Poetry dependencies"
+	@echo "  make test         Run pytest"
+	@echo "  make coverage     Run pytest with coverage report"
+	@echo "  make coverage-html Generate HTML coverage report"
+	@echo "  make api          Run FastAPI backend"
+	@echo "  make frontend     Run Streamlit frontend"
+	@echo "  make run          Run backend and frontend together"
+	@echo "  make security     Run bandit on src/"
+	@echo "  make audit        Run pip-audit inside the Poetry environment"
+	@echo "  make load-test    Run the Locust performance smoke test"
+	@echo "  make clean        Remove local caches"
 
 install:
 	poetry install
 
 test:
 	poetry run pytest
+
+coverage:
+	poetry run pytest --cov=src/team_mood_tracker --cov-report=term-missing --cov-fail-under=80
+
+coverage-html:
+	poetry run pytest --cov=src/team_mood_tracker --cov-report=html
+	@echo "Coverage report generated in htmlcov/index.html"
 
 api:
 	TEAM_MOOD_DATABASE_PATH="$(DATABASE_PATH)" poetry run uvicorn team_mood_tracker.backend.app:app --reload --host "$(API_HOST)" --port "$(API_PORT)"

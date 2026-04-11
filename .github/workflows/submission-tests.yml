@@ -164,3 +164,37 @@ jobs:
           if [ -n "${API_PID:-}" ]; then
             kill "$API_PID" || true
           fi
+
+  coverage-gate:
+    name: Coverage threshold (>= 80%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run coverage check
+        run: poetry run pytest --cov=src/team_mood_tracker --cov-report=term-missing --cov-fail-under=80
+
+      - name: Generate coverage report
+        if: always()
+        run: poetry run pytest --cov=src/team_mood_tracker --cov-report=html
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/

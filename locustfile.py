@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from locust import HttpUser, between, events, task
 
-
 P95_RESPONSE_TIME_THRESHOLD_MS = 150
 
 
