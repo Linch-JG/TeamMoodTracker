@@ -12,14 +12,23 @@ API_BASE_URL_ENV = "TEAM_MOOD_API_URL"
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 
 
+def get_api_base_url(api_base_url: str | None = None) -> str:
+    """Resolve and normalize API base URL for dashboard context calls."""
+
+    resolved_base_url = api_base_url
+    if resolved_base_url is None:
+        resolved_base_url = os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
+    return resolved_base_url.rstrip("/")
+
+
 def fetch_dashboard_wellbeing_tip(
     api_base_url: str | None = None,
 ) -> dict[str, Any]:
     """Fetch the external well-being tip from the FastAPI backend."""
 
-    base_url = api_base_url or os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
+    base_url = get_api_base_url(api_base_url)
     response = requests.get(
-        f"{base_url.rstrip('/')}/dashboard/wellbeing-tip",
+        f"{base_url}/dashboard/wellbeing-tip",
         timeout=5,
     )
     response.raise_for_status()

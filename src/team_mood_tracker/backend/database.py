@@ -75,9 +75,13 @@ def create_mood_entry(
                 created_at.isoformat(),
             ),
         )
+        inserted_entry_id = cursor.lastrowid
+
+    if inserted_entry_id is None:
+        raise RuntimeError("SQLite did not return an inserted row id.")
 
     return MoodEntryRead(
-        id=int(cursor.lastrowid),
+        id=inserted_entry_id,
         user=entry.user,
         mood=entry.mood,
         rating=entry.rating,

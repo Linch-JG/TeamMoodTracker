@@ -13,15 +13,24 @@ DEFAULT_API_BASE_URL = "http://localhost:8000"
 MOOD_OPTIONS = ("happy", "neutral", "stressed", "tired", "excited")
 
 
+def get_api_base_url(api_base_url: str | None = None) -> str:
+    """Resolve and normalize the API base URL for frontend requests."""
+
+    resolved_base_url = api_base_url
+    if resolved_base_url is None:
+        resolved_base_url = os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
+    return resolved_base_url.rstrip("/")
+
+
 def submit_mood_entry(
     payload: dict[str, Any],
     api_base_url: str | None = None,
 ) -> dict[str, Any]:
     """Submit a mood entry payload to the FastAPI backend."""
 
-    base_url = api_base_url or os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
+    base_url = get_api_base_url(api_base_url)
     response = requests.post(
-        f"{base_url.rstrip('/')}/mood-entries",
+        f"{base_url}/mood-entries",
         json=payload,
         timeout=5,
     )
