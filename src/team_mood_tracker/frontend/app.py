@@ -6,6 +6,7 @@ import streamlit as st
 
 from team_mood_tracker.frontend.dashboard_context import render_wellbeing_tip_panel
 from team_mood_tracker.frontend.submission_form import render_submission_form
+from team_mood_tracker.frontend.analytics import render_daily_trends
 
 
 def main() -> None:
@@ -17,6 +18,8 @@ def main() -> None:
     render_wellbeing_tip_panel()
     st.divider()
     render_submission_form(show_heading=False)
+    st.divider()
+    render_daily_trends()
 
 
 if __name__ == "__main__":

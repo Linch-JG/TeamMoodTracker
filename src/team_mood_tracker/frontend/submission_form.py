@@ -8,7 +8,6 @@ from typing import Any
 import requests
 import streamlit as st
 
-
 API_BASE_URL_ENV = "TEAM_MOOD_API_URL"
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 MOOD_OPTIONS = ("happy", "neutral", "stressed", "tired", "excited")

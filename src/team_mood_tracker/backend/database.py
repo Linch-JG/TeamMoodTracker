@@ -7,8 +7,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from team_mood_tracker.backend.schemas import MoodEntryCreate, MoodEntryRead
-
+from team_mood_tracker.backend.schemas import DailyTrend, MoodEntryCreate, MoodEntryRead
 
 DATABASE_PATH_ENV = "TEAM_MOOD_DATABASE_PATH"
 DEFAULT_DATABASE_PATH = Path("data/team_mood_tracker.sqlite3")
@@ -34,8 +33,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     """Create the mood entry table when it is not present."""
 
     with connect(database_path) as connection:
-        connection.execute(
-            """
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS mood_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user TEXT NOT NULL,
@@ -44,8 +42,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
                 comment TEXT,
                 created_at TEXT NOT NULL
             )
-            """
-        )
+            """)
 
 
 def create_mood_entry(
@@ -63,7 +60,13 @@ def create_mood_entry(
             INSERT INTO mood_entries (user, mood, rating, comment, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (entry.user, entry.mood, entry.rating, entry.comment, created_at.isoformat()),
+            (
+                entry.user,
+                entry.mood,
+                entry.rating,
+                entry.comment,
+                created_at.isoformat(),
+            ),
         )
 
     return MoodEntryRead(
@@ -74,3 +77,20 @@ def create_mood_entry(
         comment=entry.comment,
         created_at=created_at,
     )
+
+
+def get_daily_trends(database_path: str | Path | None = None) -> list[DailyTrend]:
+    """Get daily trends (average mood rating per day)."""
+
+    initialize_database(database_path)
+    with connect(database_path) as connection:
+        cursor = connection.execute("""
+            SELECT substr(created_at, 1, 10) as date, AVG(rating) as average_rating
+            FROM mood_entries
+            GROUP BY date
+            ORDER BY date ASC
+            """)
+        return [
+            DailyTrend(date=row["date"], average_rating=row["average_rating"])
+            for row in cursor.fetchall()
+        ]

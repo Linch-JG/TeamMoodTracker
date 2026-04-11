@@ -79,7 +79,9 @@ def test_wellbeing_tip_endpoint_returns_advice_snapshot(tmp_path, monkeypatch) -
     }
 
 
-def test_wellbeing_tip_endpoint_surfaces_provider_failures(tmp_path, monkeypatch) -> None:
+def test_wellbeing_tip_endpoint_surfaces_provider_failures(
+    tmp_path, monkeypatch
+) -> None:
     """Provider failures are returned as a bad gateway response instead of crashing the API."""
 
     app = backend_app.create_app(tmp_path / "api.sqlite3")
@@ -87,7 +89,9 @@ def test_wellbeing_tip_endpoint_surfaces_provider_failures(tmp_path, monkeypatch
     def raise_provider_error() -> WellbeingTip:
         raise ExternalContextError("Reflection provider request failed.")
 
-    monkeypatch.setattr(backend_app, "fetch_dashboard_wellbeing_tip", raise_provider_error)
+    monkeypatch.setattr(
+        backend_app, "fetch_dashboard_wellbeing_tip", raise_provider_error
+    )
 
     with TestClient(app) as client:
         response = client.get("/dashboard/wellbeing-tip")
