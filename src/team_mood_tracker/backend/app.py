@@ -9,13 +9,16 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, status
 
 from team_mood_tracker.backend.api_schemas import ServiceHealth, WellbeingTip
-from team_mood_tracker.backend.database import create_mood_entry, initialize_database
+from team_mood_tracker.backend.database import (
+    create_mood_entry,
+    initialize_database,
+    get_daily_trends,
+)
 from team_mood_tracker.backend.external_context import (
     ExternalContextError,
     fetch_dashboard_wellbeing_tip,
 )
-from team_mood_tracker.backend.schemas import MoodEntryCreate, MoodEntryRead
-
+from team_mood_tracker.backend.schemas import DailyTrend, MoodEntryCreate, MoodEntryRead
 
 APP_VERSION = "0.1.0"
 
@@ -133,6 +136,16 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(error),
             ) from error
+
+    @mood_app.get(
+        "/analytics/daily-trends",
+        response_model=list[DailyTrend],
+        summary="Get daily mood trends",
+        description="Returns the average mood rating per day.",
+    )
+    def get_daily_analytics() -> list[DailyTrend]:
+        """Return the average mood rating per day."""
+        return get_daily_trends(database_path)
 
     return mood_app
 

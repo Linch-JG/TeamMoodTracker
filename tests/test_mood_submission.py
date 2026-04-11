@@ -108,7 +108,9 @@ def test_submit_mood_entry_endpoint_rejects_invalid_rating(tmp_path) -> None:
     assert response.status_code == 422
 
     with sqlite3.connect(database_path) as connection:
-        stored_count = connection.execute("SELECT COUNT(*) FROM mood_entries").fetchone()[0]
+        stored_count = connection.execute(
+            "SELECT COUNT(*) FROM mood_entries"
+        ).fetchone()[0]
 
     assert stored_count == 0
 

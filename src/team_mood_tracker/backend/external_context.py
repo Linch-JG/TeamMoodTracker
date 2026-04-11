@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 from team_mood_tracker.backend.api_schemas import WellbeingTip
 
-
 WELLBEING_ADVICE_API_URL_ENV = "TEAM_MOOD_WELLBEING_API_URL"
 DEFAULT_WELLBEING_ADVICE_API_URL = "https://zenquotes.io/api/random"
 EXTERNAL_REQUEST_TIMEOUT_SECONDS = 5
@@ -45,7 +44,9 @@ def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
         advice = str(quote["q"]).strip()
         author = str(quote["a"]).strip()
     except (KeyError, TypeError, ValueError) as error:
-        raise ExternalContextError("Reflection provider response schema was not recognized.") from error
+        raise ExternalContextError(
+            "Reflection provider response schema was not recognized."
+        ) from error
 
     if not advice or not author:
         raise ExternalContextError("Reflection provider returned an empty quote.")

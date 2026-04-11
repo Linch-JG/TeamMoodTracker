@@ -50,8 +50,24 @@ class MoodEntryCreate(BaseModel):
 class MoodEntryRead(MoodEntryCreate):
     """Response body returned after a mood entry is stored."""
 
-    id: int = Field(description="Database identifier for the stored mood entry.", examples=[1])
+    id: int = Field(
+        description="Database identifier for the stored mood entry.", examples=[1]
+    )
     created_at: datetime = Field(
         description="UTC timestamp recorded when the mood entry was submitted.",
         examples=["2026-04-10T18:00:00+00:00"],
     )
+
+
+class DailyTrend(BaseModel):
+    """Daily average mood trend."""
+
+    date: str
+    average_rating: float
+
+
+class MoodDistribution(BaseModel):
+    """Mood distribution count."""
+
+    mood: str
+    count: int
