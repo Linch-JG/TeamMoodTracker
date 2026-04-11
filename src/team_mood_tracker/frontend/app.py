@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from team_mood_tracker.frontend.analytics import render_daily_trends
+from team_mood_tracker.frontend.analytics import (
+    render_aggregate_insights,
+    render_daily_trends,
+)
 from team_mood_tracker.frontend.dashboard_context import render_wellbeing_tip_panel
 from team_mood_tracker.frontend.history_view import render_history_view
 from team_mood_tracker.frontend.submission_form import render_submission_form
@@ -29,6 +32,7 @@ def main() -> None:
 
     with tab3:
         render_daily_trends()
+        render_aggregate_insights()
 
 
 if __name__ == "__main__":

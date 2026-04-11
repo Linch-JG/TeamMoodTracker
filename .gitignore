@@ -8,3 +8,10 @@ __pycache__/
 *.py[cod]
 .venv/
 data/
+.tmp/
+.tmp_*/
+.tmp_*
+.mypy_output.txt
+.mypy_cache_local/
+.tmp_cov/
+.coverage.*.c

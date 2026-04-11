@@ -1,4 +1,4 @@
-"""Pydantic schemas for mood submission."""
+"""Pydantic schemas for Team Mood Tracker request and response payloads."""
 
 from datetime import datetime
 
@@ -106,12 +106,48 @@ class MoodEntryUpdate(BaseModel):
 class DailyTrend(BaseModel):
     """Daily average mood trend."""
 
-    date: str
-    average_rating: float
+    date: str = Field(
+        description="Calendar date in YYYY-MM-DD format.",
+        examples=["2026-04-10"],
+    )
+    average_rating: float = Field(
+        description="Average mood rating for the given date.",
+        examples=[3.5],
+    )
 
 
 class MoodDistribution(BaseModel):
     """Mood distribution count."""
 
-    mood: str
-    count: int
+    mood: str = Field(
+        description="Mood label in the aggregated bucket.",
+        examples=["happy"],
+    )
+    count: int = Field(
+        description="Number of entries that match this mood label.",
+        examples=[8],
+    )
+
+
+class AverageMoodInsight(BaseModel):
+    """Aggregated average mood score for a selected date period."""
+
+    date_from: str | None = Field(
+        default=None,
+        description="Inclusive period start in YYYY-MM-DD format when filtering is used.",
+        examples=["2026-04-01"],
+    )
+    date_to: str | None = Field(
+        default=None,
+        description="Inclusive period end in YYYY-MM-DD format when filtering is used.",
+        examples=["2026-04-14"],
+    )
+    average_rating: float | None = Field(
+        default=None,
+        description="Average mood rating in the selected period. Null when no entries match.",
+        examples=[3.8],
+    )
+    total_entries: int = Field(
+        description="Number of mood entries included in the aggregate.",
+        examples=[24],
+    )

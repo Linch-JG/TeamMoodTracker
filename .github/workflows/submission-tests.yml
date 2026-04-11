@@ -150,11 +150,51 @@ jobs:
           required_paths = {
               "/health",
               "/mood-entries",
+              "/mood-entries/{entry_id}",
               "/dashboard/wellbeing-tip",
+              "/analytics/daily-trends",
+              "/analytics/average-mood",
+              "/analytics/mood-distribution",
           }
           missing_paths = sorted(required_paths.difference(spec["paths"]))
           if missing_paths:
               raise SystemExit(f"Missing OpenAPI paths: {missing_paths}")
+
+          missing_fields = []
+          missing_examples = []
+          for path, operations in spec["paths"].items():
+              for method, operation in operations.items():
+                  summary = operation.get("summary")
+                  description = operation.get("description")
+                  if not summary or not description:
+                      missing_fields.append(f"{method.upper()} {path}")
+
+                  responses = operation.get("responses", {})
+                  no_content_only = all(
+                      code in {"204", "304"} and "content" not in response
+                      for code, response in responses.items()
+                  )
+                  has_example = False
+                  for response in responses.values():
+                      for media in response.get("content", {}).values():
+                          if "example" in media or "examples" in media:
+                              has_example = True
+                              break
+                      if has_example:
+                          break
+                  if not has_example and not no_content_only:
+                      missing_examples.append(f"{method.upper()} {path}")
+
+          if missing_fields:
+              raise SystemExit(
+                  "OpenAPI operations missing summary/description: "
+                  + ", ".join(sorted(missing_fields))
+              )
+          if missing_examples:
+              raise SystemExit(
+                  "OpenAPI operations missing response examples: "
+                  + ", ".join(sorted(missing_examples))
+              )
           print("OpenAPI smoke check passed")
           PY
 
@@ -198,3 +238,49 @@ jobs:
         with:
           name: coverage-report
           path: htmlcov/
+
+  mypy:
+    name: Type checking (mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run mypy
+        run: poetry run mypy src
+
+  interrogate:
+    name: Documentation gate (interrogate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run interrogate
+        run: poetry run interrogate -vv src
