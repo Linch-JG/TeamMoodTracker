@@ -33,8 +33,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
     """Create the mood entry table when it is not present."""
 
     with connect(database_path) as connection:
-        connection.execute(
-            """
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS mood_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user TEXT NOT NULL,
@@ -43,8 +42,7 @@ def initialize_database(database_path: str | Path | None = None) -> None:
                 comment TEXT,
                 created_at TEXT NOT NULL
             )
-            """
-        )
+            """)
 
 
 def create_mood_entry(
@@ -86,14 +84,12 @@ def get_daily_trends(database_path: str | Path | None = None) -> list[DailyTrend
 
     initialize_database(database_path)
     with connect(database_path) as connection:
-        cursor = connection.execute(
-            """
+        cursor = connection.execute("""
             SELECT substr(created_at, 1, 10) as date, AVG(rating) as average_rating
             FROM mood_entries
             GROUP BY date
             ORDER BY date ASC
-            """
-        )
+            """)
         return [
             DailyTrend(date=row["date"], average_rating=row["average_rating"])
             for row in cursor.fetchall()
