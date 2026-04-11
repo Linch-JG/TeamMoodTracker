@@ -6,6 +6,7 @@ import json
 import os
 from urllib import request
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 
 from team_mood_tracker.backend.api_schemas import WellbeingTip
 
@@ -17,6 +18,16 @@ EXTERNAL_REQUEST_TIMEOUT_SECONDS = 5
 
 class ExternalContextError(RuntimeError):
     """Raised when the external reflection provider cannot be used safely."""
+
+
+def validate_external_api_url(api_url: str) -> str:
+    """Allow only HTTPS URLs for the external reflection provider."""
+
+    parsed_url = urlparse(api_url)
+    if parsed_url.scheme != "https" or not parsed_url.netloc:
+        raise ExternalContextError("Reflection provider URL must use HTTPS.")
+
+    return api_url
 
 
 def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
@@ -50,16 +61,22 @@ def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
 def _perform_advice_request(base_url: str | None = None) -> object:
     """Perform the outbound request to the reflection provider."""
 
-    advice_api_url = base_url or os.getenv(
-        WELLBEING_ADVICE_API_URL_ENV,
-        DEFAULT_WELLBEING_ADVICE_API_URL,
+    advice_api_url = validate_external_api_url(
+        base_url
+        or os.getenv(
+            WELLBEING_ADVICE_API_URL_ENV,
+            DEFAULT_WELLBEING_ADVICE_API_URL,
+        )
     )
     try:
         external_request = request.Request(
             advice_api_url,
             headers={"Accept": "application/json"},
         )
-        with request.urlopen(external_request, timeout=EXTERNAL_REQUEST_TIMEOUT_SECONDS) as response:
+        with request.urlopen(  # nosec B310
+            external_request,
+            timeout=EXTERNAL_REQUEST_TIMEOUT_SECONDS,
+        ) as response:
             return json.load(response)
     except (HTTPError, URLError, json.JSONDecodeError, TimeoutError) as error:
         raise ExternalContextError("Reflection provider request failed.") from error
