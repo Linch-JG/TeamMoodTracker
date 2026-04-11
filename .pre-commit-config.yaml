@@ -1,10 +1,13 @@
 repos:
--   repo: https://github.com/psf/black
-    rev: 24.4.0
+-   repo: local
     hooks:
     -   id: black
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.5
-    hooks:
+        name: black
+        entry: poetry run black
+        language: system
+        types: [python]
     -   id: ruff
-        args: [ --fix ]
+        name: ruff
+        entry: poetry run ruff check --fix
+        language: system
+        types: [python]
