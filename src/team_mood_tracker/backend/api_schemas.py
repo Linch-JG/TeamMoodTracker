@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,43 +25,33 @@ class ServiceHealth(BaseModel):
     version: str = Field(description="Application version reported by the API.")
 
 
-class ExternalWeatherContext(BaseModel):
-    """Current external weather snapshot shown on the dashboard."""
+class WellbeingTip(BaseModel):
+    """External well-being advice shown on the dashboard."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "location_name": "Configured Team Location",
-                "temperature_celsius": 12.4,
-                "wind_speed_kph": 9.2,
-                "weather_summary": "Partly cloudy",
-                "observed_at": "2026-04-11T13:00:00",
-                "source": "Open-Meteo",
+                "tip_id": 1,
+                "advice": "It's just a bad day, not a bad life.",
+                "author": "Mary Engelbreit",
+                "source": "ZenQuotes",
             }
         }
     )
 
-    location_name: str = Field(
-        description="Human-friendly label for the configured team location.",
-        examples=["Configured Team Location"],
+    tip_id: int = Field(
+        description="Provider identifier for the advice item.",
+        examples=[117],
     )
-    temperature_celsius: float = Field(
-        description="Current air temperature in degrees Celsius.",
-        examples=[12.4],
+    advice: str = Field(
+        description="Short well-being or reflection advice returned by the provider.",
+        examples=["It's just a bad day, not a bad life."],
     )
-    wind_speed_kph: float = Field(
-        description="Current wind speed in kilometers per hour.",
-        examples=[9.2],
-    )
-    weather_summary: str = Field(
-        description="Short weather label derived from the provider weather code.",
-        examples=["Partly cloudy"],
-    )
-    observed_at: datetime = Field(
-        description="Timestamp reported by the external provider for the weather snapshot.",
-        examples=["2026-04-11T13:00:00"],
+    author: str = Field(
+        description="Author associated with the tip or quote when provided by the source API.",
+        examples=["Mary Engelbreit"],
     )
     source: str = Field(
         description="External provider used for the dashboard widget.",
-        examples=["Open-Meteo"],
+        examples=["ZenQuotes"],
     )

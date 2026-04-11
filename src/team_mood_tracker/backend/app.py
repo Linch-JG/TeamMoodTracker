@@ -8,11 +8,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 
-from team_mood_tracker.backend.api_schemas import ExternalWeatherContext, ServiceHealth
+from team_mood_tracker.backend.api_schemas import ServiceHealth, WellbeingTip
 from team_mood_tracker.backend.database import create_mood_entry, initialize_database
 from team_mood_tracker.backend.external_context import (
     ExternalContextError,
-    fetch_dashboard_weather,
+    fetch_dashboard_wellbeing_tip,
 )
 from team_mood_tracker.backend.schemas import MoodEntryCreate, MoodEntryRead
 
@@ -97,39 +97,37 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         return create_mood_entry(entry, database_path)
 
     @mood_app.get(
-        "/dashboard/external-context",
-        response_model=ExternalWeatherContext,
-        summary="Get external dashboard context",
+        "/dashboard/wellbeing-tip",
+        response_model=WellbeingTip,
+        summary="Get dashboard well-being tip",
         description=(
-            "Fetches a small weather snapshot from Open-Meteo for the configured team location "
-            "so the Streamlit dashboard includes an external API integration."
+            "Fetches a short external reflection quote for the dashboard so the team check-in page "
+            "shows a small well-being prompt alongside the mood form."
         ),
         responses={
             status.HTTP_200_OK: {
-                "description": "External context fetched successfully.",
+                "description": "Well-being tip fetched successfully.",
                 "content": {
                     "application/json": {
                         "example": {
-                            "location_name": "Configured Team Location",
-                            "temperature_celsius": 12.4,
-                            "wind_speed_kph": 9.2,
-                            "weather_summary": "Partly cloudy",
-                            "observed_at": "2026-04-11T13:00:00",
-                            "source": "Open-Meteo",
+                            "tip_id": 1,
+                            "advice": "It's just a bad day, not a bad life.",
+                            "author": "Mary Engelbreit",
+                            "source": "ZenQuotes",
                         }
                     }
                 },
             },
             status.HTTP_502_BAD_GATEWAY: {
-                "description": "The external weather provider was unavailable."
+                "description": "The external reflection provider was unavailable."
             },
         },
     )
-    def get_external_dashboard_context() -> ExternalWeatherContext:
-        """Return external weather context for the Streamlit dashboard."""
+    def get_dashboard_wellbeing_tip() -> WellbeingTip:
+        """Return an external reflection quote for the Streamlit dashboard."""
 
         try:
-            return fetch_dashboard_weather()
+            return fetch_dashboard_wellbeing_tip()
         except ExternalContextError as error:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

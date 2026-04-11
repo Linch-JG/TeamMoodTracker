@@ -1,137 +1,65 @@
-"""External API integration for lightweight dashboard context."""
+"""External reflection quote integration for the dashboard."""
 
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass
-from datetime import datetime
+from urllib import request
+from urllib.error import HTTPError, URLError
 
-import requests
-
-from team_mood_tracker.backend.api_schemas import ExternalWeatherContext
+from team_mood_tracker.backend.api_schemas import WellbeingTip
 
 
-EXTERNAL_WEATHER_API_URL_ENV = "TEAM_MOOD_EXTERNAL_WEATHER_API_URL"
-TEAM_LOCATION_NAME_ENV = "TEAM_MOOD_LOCATION_NAME"
-TEAM_LOCATION_LATITUDE_ENV = "TEAM_MOOD_LOCATION_LATITUDE"
-TEAM_LOCATION_LONGITUDE_ENV = "TEAM_MOOD_LOCATION_LONGITUDE"
-DEFAULT_EXTERNAL_WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast"
-DEFAULT_TEAM_LOCATION_NAME = "Configured Team Location"
-DEFAULT_TEAM_LOCATION_LATITUDE = 55.7522
-DEFAULT_TEAM_LOCATION_LONGITUDE = 49.1114
+WELLBEING_ADVICE_API_URL_ENV = "TEAM_MOOD_WELLBEING_API_URL"
+DEFAULT_WELLBEING_ADVICE_API_URL = "https://zenquotes.io/api/random"
 EXTERNAL_REQUEST_TIMEOUT_SECONDS = 5
-WEATHER_CODE_SUMMARIES = {
-    0: "Clear sky",
-    1: "Mainly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Fog",
-    48: "Depositing rime fog",
-    51: "Light drizzle",
-    53: "Moderate drizzle",
-    55: "Dense drizzle",
-    56: "Light freezing drizzle",
-    57: "Dense freezing drizzle",
-    61: "Slight rain",
-    63: "Moderate rain",
-    65: "Heavy rain",
-    66: "Light freezing rain",
-    67: "Heavy freezing rain",
-    71: "Slight snow fall",
-    73: "Moderate snow fall",
-    75: "Heavy snow fall",
-    77: "Snow grains",
-    80: "Slight rain showers",
-    81: "Moderate rain showers",
-    82: "Violent rain showers",
-    85: "Slight snow showers",
-    86: "Heavy snow showers",
-    95: "Thunderstorm",
-    96: "Thunderstorm with light hail",
-    99: "Thunderstorm with heavy hail",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class TeamLocation:
-    """Coordinates used for the dashboard weather widget."""
-
-    name: str
-    latitude: float
-    longitude: float
 
 
 class ExternalContextError(RuntimeError):
-    """Raised when the external weather provider cannot be used safely."""
+    """Raised when the external reflection provider cannot be used safely."""
 
 
-def get_team_location() -> TeamLocation:
-    """Return the configured location for dashboard context lookups."""
+def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
+    """Fetch a short reflection quote for the dashboard."""
 
-    return TeamLocation(
-        name=os.getenv(TEAM_LOCATION_NAME_ENV, DEFAULT_TEAM_LOCATION_NAME),
-        latitude=float(os.getenv(TEAM_LOCATION_LATITUDE_ENV, DEFAULT_TEAM_LOCATION_LATITUDE)),
-        longitude=float(os.getenv(TEAM_LOCATION_LONGITUDE_ENV, DEFAULT_TEAM_LOCATION_LONGITUDE)),
-    )
+    payload = _perform_advice_request(base_url)
+    if not isinstance(payload, list) or not payload:
+        raise ExternalContextError("Reflection provider did not return a quote.")
 
-
-def describe_weather_code(weather_code: int) -> str:
-    """Translate an Open-Meteo weather code into a short label."""
-
-    return WEATHER_CODE_SUMMARIES.get(weather_code, f"Weather code {weather_code}")
-
-
-def fetch_dashboard_weather(base_url: str | None = None) -> ExternalWeatherContext:
-    """Fetch current weather data for the configured team location."""
-
-    location = get_team_location()
-    response = _perform_weather_request(location, base_url)
-    payload = response.json()
-    current = payload.get("current")
-    if not isinstance(current, dict):
-        raise ExternalContextError("Weather provider did not return current conditions.")
+    quote = payload[0]
+    if not isinstance(quote, dict):
+        raise ExternalContextError("Reflection provider did not return a quote.")
 
     try:
-        observed_at = datetime.fromisoformat(str(current["time"]))
-        weather_code = int(current["weather_code"])
-        temperature_celsius = float(current["temperature_2m"])
-        wind_speed_kph = float(current["wind_speed_10m"])
+        advice = str(quote["q"]).strip()
+        author = str(quote["a"]).strip()
     except (KeyError, TypeError, ValueError) as error:
-        raise ExternalContextError("Weather provider response schema was not recognized.") from error
+        raise ExternalContextError("Reflection provider response schema was not recognized.") from error
 
-    return ExternalWeatherContext(
-        location_name=location.name,
-        temperature_celsius=temperature_celsius,
-        wind_speed_kph=wind_speed_kph,
-        weather_summary=describe_weather_code(weather_code),
-        observed_at=observed_at,
-        source="Open-Meteo",
+    if not advice or not author:
+        raise ExternalContextError("Reflection provider returned an empty quote.")
+
+    return WellbeingTip(
+        tip_id=1,
+        advice=advice,
+        author=author,
+        source="ZenQuotes",
     )
 
 
-def _perform_weather_request(
-    location: TeamLocation,
-    base_url: str | None = None,
-) -> requests.Response:
-    """Perform the outbound request to the weather provider."""
+def _perform_advice_request(base_url: str | None = None) -> object:
+    """Perform the outbound request to the reflection provider."""
 
-    weather_api_url = base_url or os.getenv(
-        EXTERNAL_WEATHER_API_URL_ENV,
-        DEFAULT_EXTERNAL_WEATHER_API_URL,
+    advice_api_url = base_url or os.getenv(
+        WELLBEING_ADVICE_API_URL_ENV,
+        DEFAULT_WELLBEING_ADVICE_API_URL,
     )
     try:
-        response = requests.get(
-            weather_api_url,
-            params={
-                "latitude": location.latitude,
-                "longitude": location.longitude,
-                "current": "temperature_2m,wind_speed_10m,weather_code",
-                "timezone": "auto",
-            },
-            timeout=EXTERNAL_REQUEST_TIMEOUT_SECONDS,
+        external_request = request.Request(
+            advice_api_url,
+            headers={"Accept": "application/json"},
         )
-        response.raise_for_status()
-    except requests.RequestException as error:
-        raise ExternalContextError("Weather provider request failed.") from error
-
-    return response
+        with request.urlopen(external_request, timeout=EXTERNAL_REQUEST_TIMEOUT_SECONDS) as response:
+            return json.load(response)
+    except (HTTPError, URLError, json.JSONDecodeError, TimeoutError) as error:
+        raise ExternalContextError("Reflection provider request failed.") from error

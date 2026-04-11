@@ -131,7 +131,7 @@ jobs:
           required_paths = {
               "/health",
               "/mood-entries",
-              "/dashboard/external-context",
+              "/dashboard/wellbeing-tip",
           }
           missing_paths = sorted(required_paths.difference(spec["paths"]))
           if missing_paths:
