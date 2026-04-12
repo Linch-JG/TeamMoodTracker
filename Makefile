@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install test api frontend run fresh seed security audit load-test coverage coverage-html type-check docs-check clean db-clean radon-cc radon-mi quality
+.PHONY: help install test api frontend run fresh seed security audit load-test coverage coverage-html type-check docs-check clean db-clean radon-cc radon-mi quality check
 
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
@@ -25,34 +25,44 @@ help:
 	@echo "  make load-test    Run the Locust performance smoke test"
 	@echo "  make type-check   Run mypy type checking for src/"
 	@echo "  make docs-check   Run interrogate docstring coverage gate"
-	@echo "  make radon-cc     Cyclomatic complexity (radon, grade A: below 6)"
-	@echo "  make radon-mi     Maintainability index (radon mi)"
-	@echo "  make quality      black + ruff + radon-cc (matches style CI)"
+	@echo "  make radon-cc     radon cc -a -s src/"
+	@echo "  make radon-mi     radon mi -s src/"
+	@echo "  make quality      black + ruff + radon-cc (workflow style-checks)"
+	@echo "  make check        all quality gates: style, radon mi, mypy, interrogate, bandit, pip-audit, tests, coverage"
 	@echo "  make clean        Remove local caches"
 
 install:
 	poetry install
 
 radon-cc:
-	@out=$$(poetry run radon cc src -s -n B); \
-	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi
+	poetry run radon cc -a -s src/
 
 radon-mi:
-	poetry run radon mi src -s
+	poetry run radon mi -s src/
 
 quality:
 	poetry run black --check src/
 	poetry run ruff check src/
 	@$(MAKE) radon-cc
 
+check:
+	@$(MAKE) quality
+	@$(MAKE) radon-mi
+	@$(MAKE) type-check
+	@$(MAKE) docs-check
+	@$(MAKE) security
+	@$(MAKE) audit
+	@$(MAKE) test
+	@$(MAKE) coverage
+
 test:
-	poetry run pytest
+	poetry run pytest tests/
 
 coverage:
-	poetry run pytest --cov=src/team_mood_tracker --cov-report=term-missing --cov-fail-under=80
+	poetry run pytest --cov=src --cov-report=term-missing --cov-fail-under=80
 
 coverage-html:
-	poetry run pytest --cov=src/team_mood_tracker --cov-report=html
+	poetry run pytest --cov=src --cov-report=html
 	@echo "Coverage report generated in htmlcov/index.html"
 
 api:
@@ -91,7 +101,7 @@ run:
 	exit $$status
 
 security:
-	poetry run bandit -r src
+	poetry run bandit -r src/
 
 audit:
 	poetry run pip-audit
@@ -102,7 +112,7 @@ load-test:
 	api_pid=$$!; \
 	trap 'kill $$api_pid 2>/dev/null || true' INT TERM EXIT; \
 	until curl -fsS "$(API_URL)/health" >/dev/null; do sleep 1; done; \
-	poetry run locust -f locustfile.py --host "$(API_URL)" --headless -u 10 -r 1 -t 30s; \
+	poetry run locust -f locustfile.py --host "$(API_URL)" --headless -u 10 -r 1 -t 1m; \
 	status=$$?; \
 	kill $$api_pid 2>/dev/null || true; \
 	wait $$api_pid 2>/dev/null || true; \

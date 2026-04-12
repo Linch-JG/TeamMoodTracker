@@ -52,8 +52,7 @@ jobs:
             --headless \
             -u 10 \
             -r 1 \
-            -t 30s \
-            --only-summary
+            -t 1m
 
       - name: Stop API
         if: always()

@@ -75,7 +75,7 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run bandit
-        run: poetry run bandit -r src -q
+        run: poetry run bandit -r src/
 
   dependency-audit:
     name: Dependency audit (pip-audit)
@@ -229,11 +229,11 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run coverage check
-        run: poetry run pytest --cov=src/team_mood_tracker --cov-report=term-missing --cov-fail-under=80
+        run: poetry run pytest --cov=src --cov-report=term-missing --cov-fail-under=80
 
       - name: Generate coverage report
         if: always()
-        run: poetry run pytest --cov=src/team_mood_tracker --cov-report=html
+        run: poetry run pytest --cov=src --cov-report=html
 
       - name: Upload coverage report
         if: always()
