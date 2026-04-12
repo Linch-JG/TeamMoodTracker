@@ -57,12 +57,47 @@ def _show_submission_result(payload: dict[str, Any]) -> None:
     st.success(f"Mood entry #{saved_entry['id']} saved.")
 
 
+def _render_submission_page_heading() -> None:
+    """Title and intro copy for the submission page."""
+
+    st.title("Team Mood Tracker")
+    st.write("Share how today feels so the team can notice pressure early.")
+
+
+def _try_submit_mood_form(
+    submitted: bool,
+    user: str,
+    mood: str,
+    rating: int,
+    comment: str,
+) -> None:
+    """Validate form output and submit when the user clicked Submit."""
+
+    if not submitted:
+        return
+    name = user.strip()
+    if not name:
+        st.error("Enter your name before submitting.")
+        return
+    comment_stripped = comment.strip()
+    if comment_stripped:
+        comment_payload: str | None = comment_stripped
+    else:
+        comment_payload = None
+    payload = {
+        "user": name,
+        "mood": mood,
+        "rating": rating,
+        "comment": comment_payload,
+    }
+    _show_submission_result(payload)
+
+
 def render_submission_form(show_heading: bool = True) -> None:
     """Render the Streamlit mood submission form."""
 
     if show_heading:
-        st.title("Team Mood Tracker")
-        st.write("Share how today feels so the team can notice pressure early.")
+        _render_submission_page_heading()
 
     with st.form("mood-submission-form", clear_on_submit=True):
         user = st.text_input("Your name")
@@ -71,20 +106,7 @@ def render_submission_form(show_heading: bool = True) -> None:
         comment = st.text_area("Comment", placeholder="Optional context")
         submitted = st.form_submit_button("Submit mood")
 
-    if not submitted:
-        return
-
-    if not user.strip():
-        st.error("Enter your name before submitting.")
-        return
-
-    payload = {
-        "user": user.strip(),
-        "mood": mood,
-        "rating": rating,
-        "comment": comment.strip() or None,
-    }
-    _show_submission_result(payload)
+    _try_submit_mood_form(submitted, user, mood, rating, comment)
 
 
 def main() -> None:

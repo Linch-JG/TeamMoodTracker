@@ -118,6 +118,19 @@ def _write_mood_entry_summary(entry: dict[str, Any]) -> None:
         st.write(f"_{comment}_")
 
 
+def _render_entry_edit_or_delete_views(
+    entry: dict[str, Any], api_base_url: str | None
+) -> None:
+    """Show inline edit or delete UI when session state requests it."""
+
+    entry_id = entry["id"]
+    if st.session_state.get(f"editing_{entry_id}", False):
+        render_edit_form(entry, api_base_url)
+
+    if st.session_state.get(f"confirm_delete_{entry_id}", False):
+        render_delete_confirmation(entry, api_base_url)
+
+
 def _render_mood_entry_block(entry: dict[str, Any], api_base_url: str | None) -> None:
     """Render one mood entry row with actions and optional sub-views."""
 
@@ -137,13 +150,25 @@ def _render_mood_entry_block(entry: dict[str, Any], api_base_url: str | None) ->
                 st.session_state[f"confirm_delete_{entry['id']}"] = True
                 st.rerun()
 
-        if st.session_state.get(f"editing_{entry['id']}", False):
-            render_edit_form(entry, api_base_url)
-
-        if st.session_state.get(f"confirm_delete_{entry['id']}", False):
-            render_delete_confirmation(entry, api_base_url)
+        _render_entry_edit_or_delete_views(entry, api_base_url)
 
         st.divider()
+
+
+def _user_filter_param(filter_user: str) -> str | None:
+    """API `user` query param: omit empty filter."""
+
+    if not filter_user:
+        return None
+    return filter_user
+
+
+def _date_filter_param(value: date | None) -> str | None:
+    """API date query param as YYYY-MM-DD or omitted."""
+
+    if value is None:
+        return None
+    return str(value)
 
 
 def _fetch_mood_entries_safe(
@@ -159,9 +184,9 @@ def _fetch_mood_entries_safe(
     try:
         return fetch_mood_entries(
             api_base_url,
-            user=filter_user if filter_user else None,
-            date_from=str(date_from) if date_from else None,
-            date_to=str(date_to) if date_to else None,
+            user=_user_filter_param(filter_user),
+            date_from=_date_filter_param(date_from),
+            date_to=_date_filter_param(date_to),
             sort_by=sort_by,
             order=order,
         )
@@ -195,10 +220,26 @@ def render_history_view(api_base_url: str | None = None) -> None:
         st.info("No mood entries found.")
         return
 
+    _render_mood_entries_list(entries, api_base_url)
+
+
+def _render_mood_entries_list(
+    entries: list[dict[str, Any]], api_base_url: str | None
+) -> None:
+    """Render the heading and cards for a non-empty entry list."""
+
     st.write(f"Showing {len(entries)} entries:")
 
     for entry in entries:
         _render_mood_entry_block(entry, api_base_url)
+
+
+def _mood_select_index(mood: str) -> int:
+    """Index of mood in MOOD_OPTIONS, defaulting to 0."""
+
+    if mood not in MOOD_OPTIONS:
+        return 0
+    return MOOD_OPTIONS.index(mood)
 
 
 def _persist_entry_edit(
@@ -225,10 +266,9 @@ def render_edit_form(entry: dict[str, Any], api_base_url: str | None = None) -> 
 
     with st.form(key=f"edit_form_{entry['id']}"):
         updated_user = st.text_input("User", value=entry["user"])
-        mood_index = (
-            MOOD_OPTIONS.index(entry["mood"]) if entry["mood"] in MOOD_OPTIONS else 0
+        updated_mood = st.selectbox(
+            "Mood", MOOD_OPTIONS, index=_mood_select_index(entry["mood"])
         )
-        updated_mood = st.selectbox("Mood", MOOD_OPTIONS, index=mood_index)
         updated_rating = st.slider("Rating", 1, 5, entry["rating"])
         updated_comment = st.text_area(
             "Comment",
@@ -243,11 +283,14 @@ def render_edit_form(entry: dict[str, Any], api_base_url: str | None = None) -> 
             cancel = st.form_submit_button("Cancel")
 
         if submit:
+            comment_value: str | None = updated_comment
+            if not comment_value:
+                comment_value = None
             update_data = {
                 "user": updated_user,
                 "mood": updated_mood,
                 "rating": updated_rating,
-                "comment": updated_comment if updated_comment else None,
+                "comment": comment_value,
             }
             _persist_entry_edit(entry["id"], update_data, api_base_url)
 
