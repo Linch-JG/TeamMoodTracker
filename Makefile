@@ -45,7 +45,6 @@ quality:
 	poetry run ruff check src/
 	@$(MAKE) radon-cc
 
-# Everything from TeamMoodTracker.pdf / CI except load-test (needs running API + Locust).
 check:
 	@$(MAKE) quality
 	@$(MAKE) radon-mi
