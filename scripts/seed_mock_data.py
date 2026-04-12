@@ -1,9 +1,12 @@
+import os
+import random
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import random
 
-DATABASE_PATH = Path("data/team_mood_tracker.sqlite3")
+DATABASE_PATH = Path(
+    os.getenv("TEAM_MOOD_DATABASE_PATH", "data/team_mood_tracker.sqlite3")
+).expanduser()
 
 
 def seed_data():
@@ -30,8 +33,7 @@ def seed_data():
         records = []
         today = datetime.now(timezone.utc)
 
-        # Generate data for the last 14 days
-        for day_offset in range(14, -1, -1):
+        for day_offset in range(35, -1, -1):
             current_date = today - timedelta(days=day_offset)
 
             # 3 to 6 entries per day
@@ -77,7 +79,7 @@ def seed_data():
             records,
         )
         print(
-            f"Successfully inserted {cursor.rowcount} mock mood entries for the last 14 days."
+            f"Successfully inserted {cursor.rowcount} mock mood entries spanning the last 36 days."
         )
 
 

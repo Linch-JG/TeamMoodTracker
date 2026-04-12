@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 import pytest
+import pandas as pandas_module
 
 
 @pytest.fixture
@@ -13,9 +14,10 @@ def mock_st_and_deps(monkeypatch) -> tuple[MagicMock, MagicMock, MagicMock, Magi
     mock_st = MagicMock()
     mock_requests = MagicMock()
     mock_pd = MagicMock()
+    _pandas_dataframe = pandas_module.DataFrame
+    mock_pd.DataFrame = MagicMock(side_effect=lambda data: _pandas_dataframe(data))
     mock_alt = MagicMock()
 
-    # Setup mock chain for Altair chart building
     mock_chart = MagicMock()
     mock_chart.mark_line.return_value = mock_chart
     mock_chart.encode.return_value = mock_chart

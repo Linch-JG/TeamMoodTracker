@@ -73,17 +73,27 @@ def render_daily_trends() -> None:
             return
 
         trends_df = pd.DataFrame(data)
+        trends_df["date"] = pd.to_datetime(trends_df["date"])
         chart = (
             alt.Chart(trends_df)
             .mark_line(point=True)
             .encode(
-                x=alt.X("date:T", title="Date"),
+                x=alt.X(
+                    "date:T",
+                    title="Date",
+                    axis=alt.Axis(format="%Y-%m-%d", labelAngle=-35),
+                ),
                 y=alt.Y(
                     "average_rating:Q",
                     title="Average Rating",
                     scale=alt.Scale(domain=[1, 5]),
                 ),
-                tooltip=["date", "average_rating"],
+                tooltip=[
+                    alt.Tooltip("date:T", title="Date", format="%Y-%m-%d"),
+                    alt.Tooltip(
+                        "average_rating:Q", title="Average rating", format=".2f"
+                    ),
+                ],
             )
             .properties(width=600, height=300)
         )

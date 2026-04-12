@@ -8,6 +8,8 @@ from typing import Any
 import requests
 import streamlit as st
 
+from team_mood_tracker.frontend.submission_form import MOOD_OPTIONS
+
 API_BASE_URL_ENV = "TEAM_MOOD_API_URL"
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 
@@ -162,7 +164,10 @@ def render_edit_form(entry: dict[str, Any], api_base_url: str | None = None) -> 
 
     with st.form(key=f"edit_form_{entry['id']}"):
         updated_user = st.text_input("User", value=entry["user"])
-        updated_mood = st.text_input("Mood", value=entry["mood"])
+        mood_index = (
+            MOOD_OPTIONS.index(entry["mood"]) if entry["mood"] in MOOD_OPTIONS else 0
+        )
+        updated_mood = st.selectbox("Mood", MOOD_OPTIONS, index=mood_index)
         updated_rating = st.slider("Rating", 1, 5, entry["rating"])
         updated_comment = st.text_area(
             "Comment",
