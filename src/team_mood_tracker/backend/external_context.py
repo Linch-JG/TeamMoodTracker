@@ -29,16 +29,8 @@ def validate_external_api_url(api_url: str) -> str:
     return api_url
 
 
-def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
-    """Fetch a short reflection quote for the dashboard."""
-
-    payload = _perform_advice_request(base_url)
-    if not isinstance(payload, list) or not payload:
-        raise ExternalContextError("Reflection provider did not return a quote.")
-
-    quote = payload[0]
-    if not isinstance(quote, dict):
-        raise ExternalContextError("Reflection provider did not return a quote.")
+def _quote_fields_from_mapping(quote: dict) -> tuple[str, str]:
+    """Extract advice and author strings from a ZenQuotes-style mapping."""
 
     try:
         advice = str(quote["q"]).strip()
@@ -47,16 +39,47 @@ def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
         raise ExternalContextError(
             "Reflection provider response schema was not recognized."
         ) from error
+    return advice, author
+
+
+def _first_quote_mapping(payload: object) -> dict:
+    """Return the first quote object from a ZenQuotes-style JSON list."""
+
+    if not (isinstance(payload, list) and len(payload) > 0):
+        raise ExternalContextError("Reflection provider did not return a quote.")
+
+    first = payload[0]
+    if not isinstance(first, dict):
+        raise ExternalContextError("Reflection provider did not return a quote.")
+    return first
+
+
+def _non_empty_tip(advice: str, author: str) -> WellbeingTip:
+    """Build a tip or raise when text fields are blank."""
 
     if not advice or not author:
         raise ExternalContextError("Reflection provider returned an empty quote.")
-
     return WellbeingTip(
         tip_id=1,
         advice=advice,
         author=author,
         source="ZenQuotes",
     )
+
+
+def _wellbeing_tip_from_payload(payload: object) -> WellbeingTip:
+    """Validate JSON payload shape and build a WellbeingTip."""
+
+    quote = _first_quote_mapping(payload)
+    advice, author = _quote_fields_from_mapping(quote)
+    return _non_empty_tip(advice, author)
+
+
+def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
+    """Fetch a short reflection quote for the dashboard."""
+
+    payload = _perform_advice_request(base_url)
+    return _wellbeing_tip_from_payload(payload)
 
 
 def _perform_advice_request(base_url: str | None = None) -> object:

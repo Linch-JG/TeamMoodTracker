@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install test api frontend run fresh seed security audit load-test coverage coverage-html type-check docs-check clean db-clean
+.PHONY: help install test api frontend run fresh seed security audit load-test coverage coverage-html type-check docs-check clean db-clean radon-cc radon-mi quality
 
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
@@ -25,10 +25,25 @@ help:
 	@echo "  make load-test    Run the Locust performance smoke test"
 	@echo "  make type-check   Run mypy type checking for src/"
 	@echo "  make docs-check   Run interrogate docstring coverage gate"
+	@echo "  make radon-cc     Cyclomatic complexity (radon, grade A: below 6)"
+	@echo "  make radon-mi     Maintainability index (radon mi)"
+	@echo "  make quality      black + ruff + radon-cc (matches style CI)"
 	@echo "  make clean        Remove local caches"
 
 install:
 	poetry install
+
+radon-cc:
+	@out=$$(poetry run radon cc src -s -n B); \
+	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi
+
+radon-mi:
+	poetry run radon mi src -s
+
+quality:
+	poetry run black --check src/
+	poetry run ruff check src/
+	@$(MAKE) radon-cc
 
 test:
 	poetry run pytest
