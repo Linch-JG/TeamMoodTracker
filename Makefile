@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install test api frontend run security audit load-test coverage coverage-html type-check docs-check clean
+.PHONY: help install test api frontend run fresh seed security audit load-test coverage coverage-html type-check docs-check clean db-clean
 
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
@@ -17,6 +17,9 @@ help:
 	@echo "  make api          Run FastAPI backend"
 	@echo "  make frontend     Run Streamlit frontend"
 	@echo "  make run          Run backend and frontend together"
+	@echo "  make db-clean     Remove local SQLite DB (fresh schema on next API start)"
+	@echo "  make seed         Fill DB with mock mood entries (uses DATABASE_PATH)"
+	@echo "  make fresh        db-clean, seed mock data, then run"
 	@echo "  make security     Run bandit on src/"
 	@echo "  make audit        Run pip-audit inside the Poetry environment"
 	@echo "  make load-test    Run the Locust performance smoke test"
@@ -43,6 +46,15 @@ api:
 frontend:
 	TEAM_MOOD_API_URL="$(API_URL)" poetry run streamlit run src/team_mood_tracker/frontend/app.py --server.address "$(API_HOST)" --server.port "$(STREAMLIT_PORT)"
 
+db-clean:
+	rm -f "$(DATABASE_PATH)"
+	@echo "Removed $(DATABASE_PATH)"
+
+seed:
+	TEAM_MOOD_DATABASE_PATH="$(DATABASE_PATH)" poetry run python scripts/seed_mock_data.py
+
+fresh: db-clean seed run
+
 run:
 	@echo "Backend:  $(API_URL)"
 	@echo "Frontend: http://$(API_HOST):$(STREAMLIT_PORT)"
@@ -51,8 +63,14 @@ run:
 	TEAM_MOOD_API_URL="$(API_URL)" poetry run streamlit run src/team_mood_tracker/frontend/app.py --server.address "$(API_HOST)" --server.port "$(STREAMLIT_PORT)" & \
 	ui_pid=$$!; \
 	trap 'kill $$api_pid $$ui_pid 2>/dev/null || true' INT TERM EXIT; \
-	wait -n $$api_pid $$ui_pid; \
-	status=$$?; \
+	while kill -0 $$api_pid 2>/dev/null && kill -0 $$ui_pid 2>/dev/null; do sleep 1; done; \
+	if ! kill -0 $$api_pid 2>/dev/null; then \
+		wait $$api_pid; \
+		status=$$?; \
+	else \
+		wait $$ui_pid; \
+		status=$$?; \
+	fi; \
 	kill $$api_pid $$ui_pid 2>/dev/null || true; \
 	wait $$api_pid $$ui_pid 2>/dev/null || true; \
 	exit $$status
