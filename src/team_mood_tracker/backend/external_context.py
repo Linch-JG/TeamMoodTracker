@@ -62,13 +62,13 @@ def fetch_dashboard_wellbeing_tip(base_url: str | None = None) -> WellbeingTip:
 def _perform_advice_request(base_url: str | None = None) -> object:
     """Perform the outbound request to the reflection provider."""
 
-    advice_api_url = validate_external_api_url(
-        base_url
-        or os.getenv(
+    resolved_base_url = base_url
+    if resolved_base_url is None:
+        resolved_base_url = os.getenv(
             WELLBEING_ADVICE_API_URL_ENV,
             DEFAULT_WELLBEING_ADVICE_API_URL,
         )
-    )
+    advice_api_url = validate_external_api_url(resolved_base_url)
     try:
         external_request = request.Request(
             advice_api_url,

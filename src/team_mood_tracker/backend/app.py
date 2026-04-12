@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
@@ -12,7 +13,9 @@ from team_mood_tracker.backend.api_schemas import ServiceHealth, WellbeingTip
 from team_mood_tracker.backend.database import (
     create_mood_entry,
     delete_mood_entry,
+    get_average_mood_insight,
     get_daily_trends,
+    get_mood_distribution,
     get_mood_entry_by_id,
     initialize_database,
     list_mood_entries,
@@ -24,7 +27,9 @@ from team_mood_tracker.backend.external_context import (
     fetch_dashboard_wellbeing_tip,
 )
 from team_mood_tracker.backend.schemas import (
+    AverageMoodInsight,
     DailyTrend,
+    MoodDistribution,
     MoodEntryCreate,
     MoodEntryRead,
     MoodEntryUpdate,
@@ -38,6 +43,8 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        """Initialize local storage when the API process starts."""
+
         initialize_database(database_path)
         yield
 
@@ -227,7 +234,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             status.HTTP_404_NOT_FOUND: {
                 "description": "Mood entry with the specified ID does not exist."
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY: {
+            status.HTTP_422_UNPROCESSABLE_CONTENT: {
                 "description": "Invalid update data provided."
             },
         },
@@ -256,7 +263,14 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 "description": "Mood entry deleted successfully."
             },
             status.HTTP_404_NOT_FOUND: {
-                "description": "Mood entry with the specified ID does not exist."
+                "description": "Mood entry with the specified ID does not exist.",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "detail": "Mood entry with ID 404 not found",
+                        }
+                    }
+                },
             },
         },
     )
@@ -314,10 +328,96 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         response_model=list[DailyTrend],
         summary="Get daily mood trends",
         description="Returns the average mood rating per day.",
+        responses={
+            status.HTTP_200_OK: {
+                "description": "Daily average mood values ordered by date.",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {"date": "2026-04-10", "average_rating": 3.5},
+                            {"date": "2026-04-11", "average_rating": 4.0},
+                        ]
+                    }
+                },
+            }
+        },
     )
     def get_daily_analytics() -> list[DailyTrend]:
         """Return the average mood rating per day."""
         return get_daily_trends(database_path)
+
+    @mood_app.get(
+        "/analytics/average-mood",
+        response_model=AverageMoodInsight,
+        summary="Get average mood for a period",
+        description=(
+            "Returns aggregate average mood rating for an optional inclusive date range. "
+            "When no date range is provided, all stored entries are included."
+        ),
+        responses={
+            status.HTTP_200_OK: {
+                "description": "Average mood aggregate for the selected period.",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "date_from": "2026-04-01",
+                            "date_to": "2026-04-14",
+                            "average_rating": 3.8,
+                            "total_entries": 24,
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def get_average_mood(
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> AverageMoodInsight:
+        """Return aggregate average mood statistics for a selected period."""
+
+        return get_average_mood_insight(
+            database_path=database_path,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    @mood_app.get(
+        "/analytics/mood-distribution",
+        response_model=list[MoodDistribution],
+        summary="Get mood distribution",
+        description=(
+            "Returns mood bucket counts. Use `target_date` for a single-day view, or use "
+            "`date_from` and `date_to` for a selected period. Without filters, all entries are used."
+        ),
+        responses={
+            status.HTTP_200_OK: {
+                "description": "Mood distribution buckets ordered by count.",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {"mood": "happy", "count": 8},
+                            {"mood": "neutral", "count": 6},
+                            {"mood": "stressed", "count": 4},
+                        ]
+                    }
+                },
+            }
+        },
+    )
+    def get_distribution_analytics(
+        target_date: date | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> list[MoodDistribution]:
+        """Return mood distribution counts for daily or period insights."""
+
+        return get_mood_distribution(
+            database_path=database_path,
+            target_date=target_date,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
     return mood_app
 

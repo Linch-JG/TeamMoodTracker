@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from team_mood_tracker.backend.schemas import (
+    AverageMoodInsight,
     DailyTrend,
     MoodEntryCreate,
+    MoodDistribution,
     MoodEntryRead,
     MoodEntryUpdate,
 )
@@ -73,9 +75,13 @@ def create_mood_entry(
                 created_at.isoformat(),
             ),
         )
+        inserted_entry_id = cursor.lastrowid
+
+    if inserted_entry_id is None:
+        raise RuntimeError("SQLite did not return an inserted row id.")
 
     return MoodEntryRead(
-        id=int(cursor.lastrowid),
+        id=inserted_entry_id,
         user=entry.user,
         mood=entry.mood,
         rating=entry.rating,
@@ -99,6 +105,82 @@ def get_daily_trends(database_path: str | Path | None = None) -> list[DailyTrend
             DailyTrend(date=row["date"], average_rating=row["average_rating"])
             for row in cursor.fetchall()
         ]
+
+
+def get_average_mood_insight(
+    database_path: str | Path | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> AverageMoodInsight:
+    """Return average mood statistics for an optional inclusive date range."""
+
+    initialize_database(database_path)
+
+    query = "SELECT AVG(rating) AS average_rating, COUNT(*) AS total_entries FROM mood_entries"
+    conditions: list[str] = []
+    params: list[str] = []
+
+    if date_from is not None:
+        conditions.append("substr(created_at, 1, 10) >= ?")
+        params.append(date_from.isoformat())
+    if date_to is not None:
+        conditions.append("substr(created_at, 1, 10) <= ?")
+        params.append(date_to.isoformat())
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    with connect(database_path) as connection:
+        row = connection.execute(query, params).fetchone()
+
+    average_rating: float | None
+    if row is None or row["average_rating"] is None:
+        average_rating = None
+    else:
+        average_rating = float(row["average_rating"])
+
+    total_entries = 0 if row is None else int(row["total_entries"])
+    return AverageMoodInsight(
+        date_from=date_from.isoformat() if date_from is not None else None,
+        date_to=date_to.isoformat() if date_to is not None else None,
+        average_rating=average_rating,
+        total_entries=total_entries,
+    )
+
+
+def get_mood_distribution(
+    database_path: str | Path | None = None,
+    target_date: date | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[MoodDistribution]:
+    """Return mood distribution counts with optional date filters."""
+
+    initialize_database(database_path)
+
+    query = "SELECT mood, COUNT(*) AS count FROM mood_entries"
+    conditions: list[str] = []
+    params: list[str] = []
+
+    if target_date is not None:
+        conditions.append("substr(created_at, 1, 10) = ?")
+        params.append(target_date.isoformat())
+    else:
+        if date_from is not None:
+            conditions.append("substr(created_at, 1, 10) >= ?")
+            params.append(date_from.isoformat())
+        if date_to is not None:
+            conditions.append("substr(created_at, 1, 10) <= ?")
+            params.append(date_to.isoformat())
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " GROUP BY mood ORDER BY count DESC, mood ASC"
+
+    with connect(database_path) as connection:
+        rows = connection.execute(query, params).fetchall()
+
+    return [MoodDistribution(mood=row["mood"], count=row["count"]) for row in rows]
 
 
 class MoodEntryNotFoundError(Exception):

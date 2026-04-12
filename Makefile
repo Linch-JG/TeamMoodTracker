@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install test api frontend run security audit load-test coverage coverage-html clean
+.PHONY: help install test api frontend run security audit load-test coverage coverage-html type-check docs-check clean
 
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
@@ -20,6 +20,8 @@ help:
 	@echo "  make security     Run bandit on src/"
 	@echo "  make audit        Run pip-audit inside the Poetry environment"
 	@echo "  make load-test    Run the Locust performance smoke test"
+	@echo "  make type-check   Run mypy type checking for src/"
+	@echo "  make docs-check   Run interrogate docstring coverage gate"
 	@echo "  make clean        Remove local caches"
 
 install:
@@ -72,6 +74,12 @@ load-test:
 	kill $$api_pid 2>/dev/null || true; \
 	wait $$api_pid 2>/dev/null || true; \
 	exit $$status
+
+type-check:
+	poetry run mypy src
+
+docs-check:
+	poetry run interrogate -vv src
 
 clean:
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

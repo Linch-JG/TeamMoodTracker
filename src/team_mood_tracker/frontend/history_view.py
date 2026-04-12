@@ -15,8 +15,10 @@ DEFAULT_API_BASE_URL = "http://localhost:8000"
 def get_api_base_url(api_base_url: str | None = None) -> str:
     """Get the API base URL from parameter or environment."""
 
-    base_url = api_base_url or os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
-    return base_url.rstrip("/") + "/"
+    resolved_base_url = api_base_url
+    if resolved_base_url is None:
+        resolved_base_url = os.getenv(API_BASE_URL_ENV, DEFAULT_API_BASE_URL)
+    return resolved_base_url.rstrip("/") + "/"
 
 
 def fetch_mood_entries(
