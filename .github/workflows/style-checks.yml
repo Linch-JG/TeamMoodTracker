@@ -22,3 +22,12 @@ jobs:
       run: poetry run black --check src/
     - name: Run Ruff
       run: poetry run ruff check src/
+    - name: Radon cyclomatic complexity (grade A only, below 6)
+      run: |
+        out=$(poetry run radon cc src -s -n B)
+        if [ -n "$out" ]; then
+          echo "$out"
+          exit 1
+        fi
+    - name: Radon maintainability index
+      run: poetry run radon mi src -s

@@ -107,6 +107,50 @@ def get_daily_trends(database_path: str | Path | None = None) -> list[DailyTrend
         ]
 
 
+def _date_range_conditions(
+    date_from: date | None,
+    date_to: date | None,
+) -> tuple[list[str], list[str]]:
+    """Build SQL fragments for optional inclusive calendar date bounds."""
+
+    conditions: list[str] = []
+    params: list[str] = []
+    if date_from is not None:
+        conditions.append("substr(created_at, 1, 10) >= ?")
+        params.append(date_from.isoformat())
+    if date_to is not None:
+        conditions.append("substr(created_at, 1, 10) <= ?")
+        params.append(date_to.isoformat())
+    return conditions, params
+
+
+def _average_rating_from_row(row: sqlite3.Row | None) -> float | None:
+    """Return the AVG(rating) column as float when the aggregate row exists."""
+
+    if row is None:
+        return None
+    raw = row["average_rating"]
+    if raw is None:
+        return None
+    return float(raw)
+
+
+def _aggregate_row_to_insight(
+    row: sqlite3.Row | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> AverageMoodInsight:
+    """Map a SQL aggregate row to an AverageMoodInsight model."""
+
+    total_entries = int(row["total_entries"]) if row is not None else 0
+    return AverageMoodInsight(
+        date_from=date_from.isoformat() if date_from is not None else None,
+        date_to=date_to.isoformat() if date_to is not None else None,
+        average_rating=_average_rating_from_row(row),
+        total_entries=total_entries,
+    )
+
+
 def get_average_mood_insight(
     database_path: str | Path | None = None,
     date_from: date | None = None,
@@ -117,34 +161,36 @@ def get_average_mood_insight(
     initialize_database(database_path)
 
     query = "SELECT AVG(rating) AS average_rating, COUNT(*) AS total_entries FROM mood_entries"
-    conditions: list[str] = []
-    params: list[str] = []
-
-    if date_from is not None:
-        conditions.append("substr(created_at, 1, 10) >= ?")
-        params.append(date_from.isoformat())
-    if date_to is not None:
-        conditions.append("substr(created_at, 1, 10) <= ?")
-        params.append(date_to.isoformat())
+    conditions, params = _date_range_conditions(date_from, date_to)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
     with connect(database_path) as connection:
         row = connection.execute(query, params).fetchone()
 
-    average_rating: float | None
-    if row is None or row["average_rating"] is None:
-        average_rating = None
-    else:
-        average_rating = float(row["average_rating"])
+    return _aggregate_row_to_insight(row, date_from, date_to)
 
-    total_entries = 0 if row is None else int(row["total_entries"])
-    return AverageMoodInsight(
-        date_from=date_from.isoformat() if date_from is not None else None,
-        date_to=date_to.isoformat() if date_to is not None else None,
-        average_rating=average_rating,
-        total_entries=total_entries,
-    )
+
+def _mood_distribution_conditions(
+    target_date: date | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> tuple[list[str], list[str]]:
+    """Build SQL fragments for mood distribution date filtering."""
+
+    conditions: list[str] = []
+    params: list[str] = []
+    if target_date is not None:
+        conditions.append("substr(created_at, 1, 10) = ?")
+        params.append(target_date.isoformat())
+        return conditions, params
+    if date_from is not None:
+        conditions.append("substr(created_at, 1, 10) >= ?")
+        params.append(date_from.isoformat())
+    if date_to is not None:
+        conditions.append("substr(created_at, 1, 10) <= ?")
+        params.append(date_to.isoformat())
+    return conditions, params
 
 
 def get_mood_distribution(
@@ -158,19 +204,11 @@ def get_mood_distribution(
     initialize_database(database_path)
 
     query = "SELECT mood, COUNT(*) AS count FROM mood_entries"
-    conditions: list[str] = []
-    params: list[str] = []
-
-    if target_date is not None:
-        conditions.append("substr(created_at, 1, 10) = ?")
-        params.append(target_date.isoformat())
-    else:
-        if date_from is not None:
-            conditions.append("substr(created_at, 1, 10) >= ?")
-            params.append(date_from.isoformat())
-        if date_to is not None:
-            conditions.append("substr(created_at, 1, 10) <= ?")
-            params.append(date_to.isoformat())
+    conditions, params = _mood_distribution_conditions(
+        target_date,
+        date_from,
+        date_to,
+    )
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -189,6 +227,35 @@ class MoodEntryNotFoundError(Exception):
     pass
 
 
+def _list_mood_filter_conditions(
+    user: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> tuple[list[str], list[str]]:
+    """Build SQL fragments for mood entry list filters."""
+
+    conditions: list[str] = []
+    params: list[str] = []
+    if user:
+        conditions.append("user = ?")
+        params.append(user)
+    if date_from:
+        conditions.append("substr(created_at, 1, 10) >= ?")
+        params.append(date_from)
+    if date_to:
+        conditions.append("substr(created_at, 1, 10) <= ?")
+        params.append(date_to)
+    return conditions, params
+
+
+def _list_mood_order_clause(sort_by: str, order: str) -> str:
+    """Return an ORDER BY clause for mood entry listing."""
+
+    if sort_by == "rating":
+        return f" ORDER BY rating {order.upper()}"
+    return f" ORDER BY created_at {order.upper()}"
+
+
 def list_mood_entries(
     database_path: str | Path | None = None,
     user: str | None = None,
@@ -202,28 +269,12 @@ def list_mood_entries(
     initialize_database(database_path)
 
     query = "SELECT id, user, mood, rating, comment, created_at FROM mood_entries"
-    conditions = []
-    params = []
-
-    if user:
-        conditions.append("user = ?")
-        params.append(user)
-
-    if date_from:
-        conditions.append("substr(created_at, 1, 10) >= ?")
-        params.append(date_from)
-
-    if date_to:
-        conditions.append("substr(created_at, 1, 10) <= ?")
-        params.append(date_to)
+    conditions, params = _list_mood_filter_conditions(user, date_from, date_to)
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    if sort_by == "rating":
-        query += f" ORDER BY rating {order.upper()}"
-    else:
-        query += f" ORDER BY created_at {order.upper()}"
+    query += _list_mood_order_clause(sort_by, order)
 
     with connect(database_path) as connection:
         cursor = connection.execute(query, params)
