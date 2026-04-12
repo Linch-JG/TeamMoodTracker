@@ -38,6 +38,25 @@ def submit_mood_entry(
     return response.json()
 
 
+def _format_submission_error(error: requests.RequestException) -> str:
+    """Return a user-facing message for a failed mood submission request."""
+
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return f"Submission failed: {error.response.text}"
+    return f"Cannot reach the mood API: {error}"
+
+
+def _show_submission_result(payload: dict[str, Any]) -> None:
+    """Submit payload and surface success or error in Streamlit."""
+
+    try:
+        saved_entry = submit_mood_entry(payload)
+    except requests.RequestException as error:
+        st.error(_format_submission_error(error))
+        return
+    st.success(f"Mood entry #{saved_entry['id']} saved.")
+
+
 def render_submission_form(show_heading: bool = True) -> None:
     """Render the Streamlit mood submission form."""
 
@@ -65,17 +84,7 @@ def render_submission_form(show_heading: bool = True) -> None:
         "rating": rating,
         "comment": comment.strip() or None,
     }
-
-    try:
-        saved_entry = submit_mood_entry(payload)
-    except requests.HTTPError as error:
-        st.error(f"Submission failed: {error.response.text}")
-        return
-    except requests.RequestException as error:
-        st.error(f"Cannot reach the mood API: {error}")
-        return
-
-    st.success(f"Mood entry #{saved_entry['id']} saved.")
+    _show_submission_result(payload)
 
 
 def main() -> None:

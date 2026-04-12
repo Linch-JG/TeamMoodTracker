@@ -38,24 +38,10 @@ from team_mood_tracker.backend.schemas import (
 APP_VERSION = "0.1.0"
 
 
-def create_app(database_path: str | Path | None = None) -> FastAPI:
-    """Create a FastAPI app configured for a specific SQLite database."""
+def _register_health_routes(app: FastAPI) -> None:
+    """Attach the health check route."""
 
-    @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        """Initialize local storage when the API process starts."""
-
-        initialize_database(database_path)
-        yield
-
-    mood_app = FastAPI(
-        title="Team Mood Tracker API",
-        description="API for submitting team mood entries.",
-        version=APP_VERSION,
-        lifespan=lifespan,
-    )
-
-    @mood_app.get(
+    @app.get(
         "/health",
         response_model=ServiceHealth,
         summary="API health check",
@@ -84,7 +70,14 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             version=APP_VERSION,
         )
 
-    @mood_app.post(
+
+def _register_mood_entry_routes(
+    app: FastAPI,
+    database_path: str | Path | None,
+) -> None:
+    """Attach mood entry CRUD routes."""
+
+    @app.post(
         "/mood-entries",
         response_model=MoodEntryRead,
         status_code=status.HTTP_201_CREATED,
@@ -116,7 +109,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
 
         return create_mood_entry(entry, database_path)
 
-    @mood_app.get(
+    @app.get(
         "/mood-entries",
         response_model=list[MoodEntryRead],
         summary="List mood entries",
@@ -170,7 +163,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             order=order,
         )
 
-    @mood_app.get(
+    @app.get(
         "/mood-entries/{entry_id}",
         response_model=MoodEntryRead,
         summary="Get a single mood entry",
@@ -207,7 +200,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 detail=str(error),
             ) from error
 
-    @mood_app.put(
+    @app.put(
         "/mood-entries/{entry_id}",
         response_model=MoodEntryRead,
         summary="Update a mood entry",
@@ -253,7 +246,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 detail=str(error),
             ) from error
 
-    @mood_app.delete(
+    @app.delete(
         "/mood-entries/{entry_id}",
         status_code=status.HTTP_204_NO_CONTENT,
         summary="Delete a mood entry",
@@ -285,7 +278,11 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 detail=str(error),
             ) from error
 
-    @mood_app.get(
+
+def _register_dashboard_routes(app: FastAPI) -> None:
+    """Attach dashboard helper routes."""
+
+    @app.get(
         "/dashboard/wellbeing-tip",
         response_model=WellbeingTip,
         summary="Get dashboard well-being tip",
@@ -323,7 +320,14 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 detail=str(error),
             ) from error
 
-    @mood_app.get(
+
+def _register_analytics_routes(
+    app: FastAPI,
+    database_path: str | Path | None,
+) -> None:
+    """Attach analytics routes."""
+
+    @app.get(
         "/analytics/daily-trends",
         response_model=list[DailyTrend],
         summary="Get daily mood trends",
@@ -346,7 +350,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         """Return the average mood rating per day."""
         return get_daily_trends(database_path)
 
-    @mood_app.get(
+    @app.get(
         "/analytics/average-mood",
         response_model=AverageMoodInsight,
         summary="Get average mood for a period",
@@ -382,7 +386,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             date_to=date_to,
         )
 
-    @mood_app.get(
+    @app.get(
         "/analytics/mood-distribution",
         response_model=list[MoodDistribution],
         summary="Get mood distribution",
@@ -418,6 +422,29 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             date_from=date_from,
             date_to=date_to,
         )
+
+
+def create_app(database_path: str | Path | None = None) -> FastAPI:
+    """Create a FastAPI app configured for a specific SQLite database."""
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        """Initialize local storage when the API process starts."""
+
+        initialize_database(database_path)
+        yield
+
+    mood_app = FastAPI(
+        title="Team Mood Tracker API",
+        description="API for submitting team mood entries.",
+        version=APP_VERSION,
+        lifespan=lifespan,
+    )
+
+    _register_health_routes(mood_app)
+    _register_mood_entry_routes(mood_app, database_path)
+    _register_dashboard_routes(mood_app)
+    _register_analytics_routes(mood_app, database_path)
 
     return mood_app
 

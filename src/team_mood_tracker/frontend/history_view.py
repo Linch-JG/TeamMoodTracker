@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date
 from typing import Any
 
 import requests
@@ -81,10 +82,8 @@ def delete_mood_entry_api(entry_id: int, api_base_url: str | None = None) -> Non
     response.raise_for_status()
 
 
-def render_history_view(api_base_url: str | None = None) -> None:
-    """Render the mood history management interface."""
-
-    st.header("Mood History")
+def _render_history_filter_widgets() -> tuple[str, date | None, date | None, str, str]:
+    """Render filter controls and return user input values."""
 
     with st.expander("Filters and Sorting", expanded=False):
         col1, col2 = st.columns(2)
@@ -103,11 +102,62 @@ def render_history_view(api_base_url: str | None = None) -> None:
 
         order = st.radio("Order", ["desc", "asc"], index=0, horizontal=True)
 
-    if st.button("Refresh", type="primary"):
-        st.rerun()
+    return filter_user, date_from, date_to, sort_by, order
+
+
+def _write_mood_entry_summary(entry: dict[str, Any]) -> None:
+    """Show user line and optional comment for one entry."""
+
+    created_at = entry["created_at"].split("T")[0]
+    st.write(
+        f"**{entry['user']}** - {entry['mood']} "
+        f"(Rating: {entry['rating']}/5) - {created_at}"
+    )
+    comment = entry.get("comment")
+    if comment:
+        st.write(f"_{comment}_")
+
+
+def _render_mood_entry_block(entry: dict[str, Any], api_base_url: str | None) -> None:
+    """Render one mood entry row with actions and optional sub-views."""
+
+    with st.container():
+        col1, col2, col3 = st.columns([3, 1, 1])
+
+        with col1:
+            _write_mood_entry_summary(entry)
+
+        with col2:
+            if st.button("Edit", key=f"edit_{entry['id']}"):
+                st.session_state[f"editing_{entry['id']}"] = True
+                st.rerun()
+
+        with col3:
+            if st.button("Delete", key=f"delete_{entry['id']}"):
+                st.session_state[f"confirm_delete_{entry['id']}"] = True
+                st.rerun()
+
+        if st.session_state.get(f"editing_{entry['id']}", False):
+            render_edit_form(entry, api_base_url)
+
+        if st.session_state.get(f"confirm_delete_{entry['id']}", False):
+            render_delete_confirmation(entry, api_base_url)
+
+        st.divider()
+
+
+def _fetch_mood_entries_safe(
+    api_base_url: str | None,
+    filter_user: str,
+    date_from: date | None,
+    date_to: date | None,
+    sort_by: str,
+    order: str,
+) -> list[dict[str, Any]] | None:
+    """Load mood entries or show an error; return None when the request fails."""
 
     try:
-        entries = fetch_mood_entries(
+        return fetch_mood_entries(
             api_base_url,
             user=filter_user if filter_user else None,
             date_from=str(date_from) if date_from else None,
@@ -115,46 +165,57 @@ def render_history_view(api_base_url: str | None = None) -> None:
             sort_by=sort_by,
             order=order,
         )
-
-        if not entries:
-            st.info("No mood entries found.")
-            return
-
-        st.write(f"Showing {len(entries)} entries:")
-
-        for entry in entries:
-            with st.container():
-                col1, col2, col3 = st.columns([3, 1, 1])
-
-                with col1:
-                    created_at = entry["created_at"].split("T")[0]
-                    st.write(
-                        f"**{entry['user']}** - {entry['mood']} "
-                        f"(Rating: {entry['rating']}/5) - {created_at}"
-                    )
-                    if entry.get("comment"):
-                        st.write(f"_{entry['comment']}_")
-
-                with col2:
-                    if st.button("Edit", key=f"edit_{entry['id']}"):
-                        st.session_state[f"editing_{entry['id']}"] = True
-                        st.rerun()
-
-                with col3:
-                    if st.button("Delete", key=f"delete_{entry['id']}"):
-                        st.session_state[f"confirm_delete_{entry['id']}"] = True
-                        st.rerun()
-
-                if st.session_state.get(f"editing_{entry['id']}", False):
-                    render_edit_form(entry, api_base_url)
-
-                if st.session_state.get(f"confirm_delete_{entry['id']}", False):
-                    render_delete_confirmation(entry, api_base_url)
-
-                st.divider()
-
     except requests.exceptions.RequestException as error:
         st.error(f"Failed to fetch mood entries: {error}")
+        return None
+
+
+def render_history_view(api_base_url: str | None = None) -> None:
+    """Render the mood history management interface."""
+
+    st.header("Mood History")
+
+    filter_user, date_from, date_to, sort_by, order = _render_history_filter_widgets()
+
+    if st.button("Refresh", type="primary"):
+        st.rerun()
+
+    entries = _fetch_mood_entries_safe(
+        api_base_url,
+        filter_user,
+        date_from,
+        date_to,
+        sort_by,
+        order,
+    )
+    if entries is None:
+        return
+
+    if not entries:
+        st.info("No mood entries found.")
+        return
+
+    st.write(f"Showing {len(entries)} entries:")
+
+    for entry in entries:
+        _render_mood_entry_block(entry, api_base_url)
+
+
+def _persist_entry_edit(
+    entry_id: int,
+    update_data: dict[str, Any],
+    api_base_url: str | None,
+) -> None:
+    """Apply an update via the API or show an error."""
+
+    try:
+        update_mood_entry(entry_id, update_data, api_base_url)
+    except requests.exceptions.RequestException as error:
+        st.error(f"Failed to update entry: {error}")
+        return
+    st.success("Entry updated successfully!")
+    st.session_state[f"editing_{entry_id}"] = False
+    st.rerun()
 
 
 def render_edit_form(entry: dict[str, Any], api_base_url: str | None = None) -> None:
@@ -182,19 +243,13 @@ def render_edit_form(entry: dict[str, Any], api_base_url: str | None = None) -> 
             cancel = st.form_submit_button("Cancel")
 
         if submit:
-            try:
-                update_data = {
-                    "user": updated_user,
-                    "mood": updated_mood,
-                    "rating": updated_rating,
-                    "comment": updated_comment if updated_comment else None,
-                }
-                update_mood_entry(entry["id"], update_data, api_base_url)
-                st.success("Entry updated successfully!")
-                st.session_state[f"editing_{entry['id']}"] = False
-                st.rerun()
-            except requests.exceptions.RequestException as error:
-                st.error(f"Failed to update entry: {error}")
+            update_data = {
+                "user": updated_user,
+                "mood": updated_mood,
+                "rating": updated_rating,
+                "comment": updated_comment if updated_comment else None,
+            }
+            _persist_entry_edit(entry["id"], update_data, api_base_url)
 
         if cancel:
             st.session_state[f"editing_{entry['id']}"] = False
